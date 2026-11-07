@@ -1,5 +1,7 @@
 # claude-activity-graph
 
+![claude-activity-graph: the example vault rendered as a typed graph](docs/social-preview.png)
+
 A coding agent that keeps its own engineering record as a typed knowledge graph.
 
 Every session I run with Claude Code reads from and writes to an Obsidian vault: tasks change status, decisions get recorded with the options I rejected, failures become lessons linked to the task that taught them, and each session closes with a note that links everything it touched. The vault is plain Markdown, so I browse it in Obsidian's graph view; the agent reads `index.md` and the lesson notes before it starts work, so the next session starts from what the last one learned.
