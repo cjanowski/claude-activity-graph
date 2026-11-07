@@ -138,7 +138,7 @@ tests/                       unittest: parser, graph, lint, hook
 
 ## Credits
 
-- **Andrej Karpathy**: the LLM-wiki pattern this is built around. Immutable raw sources, a wiki the LLM compiles and maintains from them, an `index.md` catalog and an append-only `log.md`, and periodic lint passes. His framing of the LLM as the wiki's maintainer, not just its reader, is the core idea here. ([gists](https://gist.github.com/karpathy))
+- **[Andrej Karpathy](https://github.com/karpathy)**: the LLM-wiki pattern this is built around. Immutable raw sources, a wiki the LLM compiles and maintains from them, an `index.md` catalog and an append-only `log.md`, and periodic lint passes. His framing of the LLM as the wiki's maintainer, not just its reader, is the core idea here.
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** by Anthropic: the agent runtime. `CLAUDE.md` memory, Skills and Stop hooks are the three extension points this uses. The lesson format (a rule, then **Why:** and **How to apply:**) is adapted from Claude Code's memory-note convention.
 - **[Obsidian](https://obsidian.md)** and its Bases core plugin: graph view and table views over plain Markdown.
 - **[d3](https://d3js.org)** (Mike Bostock and contributors): force layout in the graph explorer.
