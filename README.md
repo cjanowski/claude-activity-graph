@@ -6,7 +6,9 @@ Every session I run with Claude Code reads from and writes to an Obsidian vault:
 
 This repo is the system without my data: the agent rule, the skill, the enforcement hook, the tooling, an empty vault scaffold, and a synthetic example vault.
 
-[Interactive graph of the example vault](docs/index.html) · `python3 tools/vault_graph.py --vault example-vault stats`
+[![ci](https://github.com/cjanowski/claude-activity-graph/actions/workflows/ci.yml/badge.svg)](https://github.com/cjanowski/claude-activity-graph/actions/workflows/ci.yml)
+
+**[Live: interactive graph of the example vault](https://cjanowski.github.io/claude-activity-graph/)** · `python3 tools/vault_graph.py --vault example-vault stats`
 
 ## Why
 
