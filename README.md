@@ -145,7 +145,7 @@ tests/                       unittest: parser, graph, lint, hook
 - **[Obsidian](https://obsidian.md)** and its Bases core plugin: graph view and table views over plain Markdown.
 - **[d3](https://d3js.org)** (Mike Bostock and contributors): force layout in the graph explorer.
 - **[GitHub CLI](https://cli.github.com)**: the data source for `github_ingest.py`.
-- The categorical palette in the explorer follows a colour-vision-deficiency-checked ordering, with shape as a second encoding so no type relies on colour alone.
+- The categorical palette in the explorer follows a color-vision-deficiency-checked ordering, with shape as a second encoding so no type relies on color alone.
 
 ## License
 
