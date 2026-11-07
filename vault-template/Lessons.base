@@ -1,0 +1,21 @@
+filters:
+  and:
+    - type == "lesson"
+views:
+  - type: table
+    name: All lessons
+    order:
+      - file.name
+      - project
+      - stage
+      - auto
+      - source
+  - type: table
+    name: Judgment only
+    filters:
+      and:
+        - auto != true
+    order:
+      - file.name
+      - stage
+      - source

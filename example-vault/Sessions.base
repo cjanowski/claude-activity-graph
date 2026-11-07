@@ -1,0 +1,11 @@
+filters:
+  and:
+    - type == "session"
+views:
+  - type: table
+    name: By date
+    order:
+      - date
+      - project
+      - file.name
+      - touched

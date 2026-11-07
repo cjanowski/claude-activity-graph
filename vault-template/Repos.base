@@ -1,0 +1,12 @@
+filters:
+  and:
+    - type == "repo"
+views:
+  - type: table
+    name: By last push
+    order:
+      - name
+      - language
+      - pushed
+      - private
+      - description

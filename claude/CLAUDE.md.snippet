@@ -1,0 +1,23 @@
+# Activity graph (applies in every project)
+
+All my work is recorded as a graph in an Obsidian vault. Its path is the one line in
+`~/.claude/tools/vault_path`. Procedures are in the `graph` skill.
+
+Notes are nodes, wiki links are edges, the `type` property says what a note is.
+Read the vault's `README.md` once per session for the conventions.
+
+Keep it current without being asked:
+- Start of a session: read the project's `project.md` and the lesson notes for what I am about to do.
+- During work: when a task starts or changes stage, update its note's `status` (or create it from `_templates/`). Record a choice between real alternatives as a Decision note. Record a repeatable cause of failure or success as a Lesson note with a `source` link.
+- End of every session with real work in it: write or update today's Session note in `sessions/YYYY-MM-DD-<project>.md`: what was done, links to every task, decision and lesson touched, what is next.
+- A new project gets `<project>/` with `project.md`, `tasks/`, `lessons/`, `decisions/`, created in its first session.
+- Work that isn't a project task (tooling, setup, research) still gets a Session note and, if it produced something durable, a note of the right type.
+- Lessons that hold across projects go in `shared/lessons/`.
+
+Keep frontmatter keys as the templates have them. Update an existing note rather than creating a near duplicate. Link liberally.
+
+Wiki habits:
+- `index.md` catalogs every note; read it first when answering from the vault. `log.md` is append-only: add `## [YYYY-MM-DD] <op> | <title>` for each session, ingest or lint.
+- When you research or compare something for me, file the answer as a note (type: reference or decision), not only in chat. Raw sources go under `raw/` unchanged, and notes link back to them.
+- Run `python3 ~/.claude/tools/vault_lint.py` at the end of a session that added notes, and fix what it reports.
+- Run `python3 ~/.claude/tools/github_ingest.py --days 30` after any session that pushed commits or opened PRs.

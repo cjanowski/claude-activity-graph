@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity Graph</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --surface-2: #f2f1ee; --text: #0b0b0b; --text-2: #52514e; --muted: #8a8984;
+    --edge: rgba(60, 60, 55, .22); --edge-hi: rgba(20, 20, 18, .75);
+    --t-task: #2a78d6; --t-lesson: #eb6834; --t-decision: #1baf7a; --t-session: #eda100;
+    --t-project: #e87ba4; --t-repo: #008300; --t-reference: #6250d6; --t-activity: #e34948; --t-other: #9a9994;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface: #1a1a19; --surface-2: #242423; --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e86;
+      --edge: rgba(220, 220, 210, .18); --edge-hi: rgba(240, 240, 235, .8);
+      --t-task: #3987e5; --t-lesson: #d95926; --t-decision: #199e70; --t-session: #c98500;
+      --t-project: #d55181; --t-repo: #008300; --t-reference: #9085e9; --t-activity: #e66767; --t-other: #6d6c67;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --surface-2: #242423; --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e86;
+    --edge: rgba(220, 220, 210, .18); --edge-hi: rgba(240, 240, 235, .8);
+    --t-task: #3987e5; --t-lesson: #d95926; --t-decision: #199e70; --t-session: #c98500;
+    --t-project: #d55181; --t-repo: #008300; --t-reference: #9085e9; --t-activity: #e66767; --t-other: #6d6c67;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--text);
+         font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 16px 16px 8px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--text-2); }
+  .bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px; max-width: 1200px; margin: 0 auto; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+          border: 1px solid var(--edge); background: var(--surface-2); color: var(--text); cursor: pointer; font: inherit; }
+  .chip[aria-pressed="false"] { opacity: .45; }
+  .sw { width: 10px; height: 10px; border-radius: 50%; }
+  .stage { position: relative; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+  #g { width: 100%; height: min(72vh, 760px); display: block; background: var(--surface-2); border-radius: 10px; touch-action: none; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); color: var(--text); border: 1px solid var(--edge);
+         border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; max-width: 280px; }
+  .tip b { display: block; font-size: 13px; }
+  .tip span { color: var(--text-2); }
+  details { max-width: 1200px; margin: 12px auto 32px; padding: 0 16px; }
+  summary { cursor: pointer; color: var(--text-2); }
+  .tbl { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--edge); }
+  th { color: var(--text-2); font-weight: 600; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Activity graph</h1>
+  <p id="sub">Notes are nodes, wiki links are edges. Drag to rearrange, scroll to zoom, hover a node to see its neighbours.</p>
+</header>
+<div class="bar" id="legend" role="group" aria-label="Filter by note type"></div>
+<div class="stage">
+  <svg id="g" role="img" aria-label="Force-directed graph of notes and links"></svg>
+  <div class="tip" id="tip"></div>
+</div>
+<details>
+  <summary>Table view</summary>
+  <div class="tbl"><table id="table"><thead><tr><th>Note</th><th>Type</th><th>Project</th><th>Status</th><th>In</th><th>Out</th></tr></thead><tbody></tbody></table></div>
+</details>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const TYPES = ["task", "lesson", "decision", "session", "project", "repo", "reference", "activity", "other"];
+const SHAPE = { task: d3.symbolCircle, lesson: d3.symbolTriangle, decision: d3.symbolDiamond, session: d3.symbolSquare,
+                project: d3.symbolStar, repo: d3.symbolCross, reference: d3.symbolWye, activity: d3.symbolSquare, other: d3.symbolCircle };
+const typeOf = t => TYPES.includes(t) ? t : "other";
+const color = t => `var(--t-${typeOf(t)})`;
+const nodes = DATA.nodes.filter(n => n.type !== "index").map(n => ({ ...n }));
+const ids = new Set(nodes.map(n => n.id));
+const links = DATA.edges.filter(e => ids.has(e.source) && ids.has(e.target)).map(e => ({ ...e }));
+document.getElementById("sub").textContent =
+  `${nodes.length} notes, ${links.length} links. Drag to rearrange, scroll to zoom, hover a node to see its neighbours.`;
+
+const hidden = new Set();
+const present = TYPES.filter(t => nodes.some(n => typeOf(n.type) === t));
+const legend = d3.select("#legend");
+present.forEach(t => {
+  const count = nodes.filter(n => typeOf(n.type) === t).length;
+  const b = legend.append("button").attr("class", "chip").attr("aria-pressed", "true")
+    .on("click", function () {
+      hidden.has(t) ? hidden.delete(t) : hidden.add(t);
+      d3.select(this).attr("aria-pressed", hidden.has(t) ? "false" : "true");
+      applyFilter();
+    });
+  b.append("svg").attr("width", 12).attr("height", 12).attr("aria-hidden", "true")
+    .append("path").attr("transform", "translate(6,6)").attr("d", d3.symbol(SHAPE[t], 60)).attr("fill", color(t));
+  b.append("span").text(`${t} ${count}`);
+});
+
+const svg = d3.select("#g");
+const root = svg.append("g");
+svg.call(d3.zoom().scaleExtent([0.2, 5]).on("zoom", ev => root.attr("transform", ev.transform)));
+const size = d => 70 + 40 * Math.sqrt(d.in);
+const link = root.append("g").selectAll("line").data(links).join("line")
+  .attr("stroke", "var(--edge)").attr("stroke-width", 1.2)
+  .attr("stroke-dasharray", d => d.label === "mentions" ? "3 3" : null);
+const node = root.append("g").selectAll("path").data(nodes).join("path")
+  .attr("d", d => d3.symbol(SHAPE[typeOf(d.type)], d.type === "project" ? 360 : size(d))())
+  .attr("fill", d => color(d.type)).attr("stroke", "var(--surface-2)").attr("stroke-width", 2)
+  .style("cursor", "grab");
+const label = root.append("g").selectAll("text").data(nodes.filter(n => n.type === "project" || n.type === "lesson")).join("text")
+  .text(d => d.type === "project" ? `${d.project} (project)` : d.name).attr("font-size", 11).attr("fill", "var(--text-2)")
+  .attr("dx", 10).attr("dy", 4).style("pointer-events", "none");
+
+const sim = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(l => l.label === "mentions" ? 110 : 70).strength(0.6))
+  .force("charge", d3.forceManyBody().strength(-260))
+  .force("collide", d3.forceCollide(16))
+  .force("x", d3.forceX().strength(0.04)).force("y", d3.forceY().strength(0.06))
+  .on("tick", () => {
+    link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+    label.attr("x", d => d.x).attr("y", d => d.y);
+  });
+function fit() {
+  const r = svg.node().getBoundingClientRect();
+  svg.attr("viewBox", [-r.width / 2, -r.height / 2, r.width, r.height]);
+}
+fit(); window.addEventListener("resize", fit);
+
+node.call(d3.drag()
+  .on("start", (ev, d) => { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+  .on("drag", (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+  .on("end", (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+const tip = document.getElementById("tip");
+const stage = document.querySelector(".stage");
+node.on("pointerenter", (ev, d) => {
+  const nb = new Set([d.id]);
+  links.forEach(l => { if (l.source.id === d.id) nb.add(l.target.id); if (l.target.id === d.id) nb.add(l.source.id); });
+  node.attr("opacity", n => nb.has(n.id) ? 1 : 0.15);
+  link.attr("stroke", l => l.source.id === d.id || l.target.id === d.id ? "var(--edge-hi)" : "var(--edge)");
+  const edgeLabels = [...new Set(links.filter(l => l.source.id === d.id).map(l => l.label))].join(", ");
+  tip.innerHTML = "";
+  const b = document.createElement("b"); b.textContent = d.name; tip.appendChild(b);
+  const s = document.createElement("span");
+  s.textContent = `${d.type} · ${d.project}${d.status ? " · " + d.status : ""} · ${d.in} in / ${d.out} out${edgeLabels ? " · links via " + edgeLabels : ""}`;
+  tip.appendChild(s);
+  tip.style.display = "block";
+}).on("pointermove", ev => {
+  const r = stage.getBoundingClientRect();
+  const x = Math.min(ev.clientX - r.left + 14, r.width - 290);
+  tip.style.left = `${Math.max(16, x)}px`; tip.style.top = `${ev.clientY - r.top + 14}px`;
+}).on("pointerleave", () => {
+  tip.style.display = "none"; applyFilter(); link.attr("stroke", "var(--edge)");
+});
+
+function applyFilter() {
+  const vis = n => !hidden.has(typeOf(n.type));
+  node.attr("opacity", n => vis(n) ? 1 : 0).style("pointer-events", n => vis(n) ? null : "none");
+  label.attr("opacity", n => vis(n) ? 1 : 0);
+  link.attr("opacity", l => vis(l.source) && vis(l.target) ? 1 : 0);
+}
+
+const tbody = d3.select("#table tbody");
+nodes.slice().sort((a, b) => b.in - a.in || a.id.localeCompare(b.id)).forEach(n => {
+  const tr = tbody.append("tr");
+  [n.id, n.type, n.project, n.status || ""].forEach(v => tr.append("td").text(v));
+  tr.append("td").attr("class", "n").text(n.in); tr.append("td").attr("class", "n").text(n.out);
+});
+</script>
+</body>
+</html>

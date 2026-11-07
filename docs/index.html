@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity Graph</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --surface-2: #f2f1ee; --text: #0b0b0b; --text-2: #52514e; --muted: #8a8984;
+    --edge: rgba(60, 60, 55, .22); --edge-hi: rgba(20, 20, 18, .75);
+    --t-task: #2a78d6; --t-lesson: #eb6834; --t-decision: #1baf7a; --t-session: #eda100;
+    --t-project: #e87ba4; --t-repo: #008300; --t-reference: #6250d6; --t-activity: #e34948; --t-other: #9a9994;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface: #1a1a19; --surface-2: #242423; --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e86;
+      --edge: rgba(220, 220, 210, .18); --edge-hi: rgba(240, 240, 235, .8);
+      --t-task: #3987e5; --t-lesson: #d95926; --t-decision: #199e70; --t-session: #c98500;
+      --t-project: #d55181; --t-repo: #008300; --t-reference: #9085e9; --t-activity: #e66767; --t-other: #6d6c67;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --surface-2: #242423; --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e86;
+    --edge: rgba(220, 220, 210, .18); --edge-hi: rgba(240, 240, 235, .8);
+    --t-task: #3987e5; --t-lesson: #d95926; --t-decision: #199e70; --t-session: #c98500;
+    --t-project: #d55181; --t-repo: #008300; --t-reference: #9085e9; --t-activity: #e66767; --t-other: #6d6c67;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--text);
+         font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 16px 16px 8px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--text-2); }
+  .bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px; max-width: 1200px; margin: 0 auto; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+          border: 1px solid var(--edge); background: var(--surface-2); color: var(--text); cursor: pointer; font: inherit; }
+  .chip[aria-pressed="false"] { opacity: .45; }
+  .sw { width: 10px; height: 10px; border-radius: 50%; }
+  .stage { position: relative; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+  #g { width: 100%; height: min(72vh, 760px); display: block; background: var(--surface-2); border-radius: 10px; touch-action: none; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); color: var(--text); border: 1px solid var(--edge);
+         border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; max-width: 280px; }
+  .tip b { display: block; font-size: 13px; }
+  .tip span { color: var(--text-2); }
+  details { max-width: 1200px; margin: 12px auto 32px; padding: 0 16px; }
+  summary { cursor: pointer; color: var(--text-2); }
+  .tbl { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--edge); }
+  th { color: var(--text-2); font-weight: 600; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Activity graph</h1>
+  <p id="sub">Notes are nodes, wiki links are edges. Drag to rearrange, scroll to zoom, hover a node to see its neighbours.</p>
+</header>
+<div class="bar" id="legend" role="group" aria-label="Filter by note type"></div>
+<div class="stage">
+  <svg id="g" role="img" aria-label="Force-directed graph of notes and links"></svg>
+  <div class="tip" id="tip"></div>
+</div>
+<details>
+  <summary>Table view</summary>
+  <div class="tbl"><table id="table"><thead><tr><th>Note</th><th>Type</th><th>Project</th><th>Status</th><th>In</th><th>Out</th></tr></thead><tbody></tbody></table></div>
+</details>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+const DATA = {"nodes": [{"id": "README", "name": "README", "type": "index", "project": "README", "status": null, "in": 0, "out": 2}, {"id": "github/activity/2026-10-19", "name": "2026-10-19", "type": "activity", "project": "github", "status": null, "in": 0, "out": 5}, {"id": "github/activity/2026-10-21", "name": "2026-10-21", "type": "activity", "project": "github", "status": null, "in": 0, "out": 4}, {"id": "github/repos/inference-gateway", "name": "inference-gateway", "type": "repo", "project": "github", "status": null, "in": 8, "out": 1}, {"id": "github/repos/rag-service", "name": "rag-service", "type": "repo", "project": "github", "status": null, "in": 11, "out": 1}, {"id": "inference-gateway/decisions/sse-over-websockets", "name": "sse-over-websockets", "type": "decision", "project": "inference-gateway", "status": null, "in": 3, "out": 1}, {"id": "inference-gateway/lessons/backpressure-at-the-edge", "name": "backpressure-at-the-edge", "type": "lesson", "project": "inference-gateway", "status": null, "in": 2, "out": 2}, {"id": "inference-gateway/lessons/cache-keys-include-model-version", "name": "cache-keys-include-model-version", "type": "lesson", "project": "inference-gateway", "status": null, "in": 6, "out": 2}, {"id": "inference-gateway/project", "name": "project", "type": "project", "project": "inference-gateway", "status": "active", "in": 2, "out": 4}, {"id": "inference-gateway/tasks/prompt-cache-keys", "name": "prompt-cache-keys", "type": "task", "project": "inference-gateway", "status": "done", "in": 4, "out": 2}, {"id": "inference-gateway/tasks/provider-failover", "name": "provider-failover", "type": "task", "project": "inference-gateway", "status": "in-progress", "in": 5, "out": 3}, {"id": "inference-gateway/tasks/streaming-backpressure", "name": "streaming-backpressure", "type": "task", "project": "inference-gateway", "status": "done", "in": 7, "out": 4}, {"id": "rag-service/decisions/pgvector-over-dedicated-vector-db", "name": "pgvector-over-dedicated-vector-db", "type": "decision", "project": "rag-service", "status": null, "in": 4, "out": 2}, {"id": "rag-service/lessons/chunk-on-structure-not-tokens", "name": "chunk-on-structure-not-tokens", "type": "lesson", "project": "rag-service", "status": null, "in": 3, "out": 2}, {"id": "rag-service/lessons/measure-recall-before-reranking", "name": "measure-recall-before-reranking", "type": "lesson", "project": "rag-service", "status": null, "in": 3, "out": 2}, {"id": "rag-service/project", "name": "project", "type": "project", "project": "rag-service", "status": "active", "in": 3, "out": 7}, {"id": "rag-service/tasks/chunk-by-headings", "name": "chunk-by-headings", "type": "task", "project": "rag-service", "status": "done", "in": 4, "out": 2}, {"id": "rag-service/tasks/embedding-cache", "name": "embedding-cache", "type": "task", "project": "rag-service", "status": "in-progress", "in": 3, "out": 2}, {"id": "rag-service/tasks/hybrid-bm25-dense", "name": "hybrid-bm25-dense", "type": "task", "project": "rag-service", "status": "done", "in": 4, "out": 3}, {"id": "rag-service/tasks/reranker-latency", "name": "reranker-latency", "type": "task", "project": "rag-service", "status": "done", "in": 4, "out": 2}, {"id": "rag-service/tasks/retrieval-regression-set", "name": "retrieval-regression-set", "type": "task", "project": "rag-service", "status": "done", "in": 6, "out": 3}, {"id": "raw/README", "name": "README", "type": "index", "project": "raw", "status": null, "in": 0, "out": 0}, {"id": "raw/inference-gateway/2026-10-20-provider-rate-limit-notes", "name": "2026-10-20-provider-rate-limit-notes", "type": "raw", "project": "inference-gateway", "status": null, "in": 1, "out": 0}, {"id": "raw/rag-service/2026-10-18-support-ticket-notes", "name": "2026-10-18-support-ticket-notes", "type": "raw", "project": "rag-service", "status": null, "in": 1, "out": 0}, {"id": "sessions/2026-10-18-rag-service", "name": "2026-10-18-rag-service", "type": "session", "project": "rag-service", "status": null, "in": 0, "out": 5}, {"id": "sessions/2026-10-19-rag-service", "name": "2026-10-19-rag-service", "type": "session", "project": "rag-service", "status": null, "in": 0, "out": 6}, {"id": "sessions/2026-10-21-inference-gateway", "name": "2026-10-21-inference-gateway", "type": "session", "project": "inference-gateway", "status": null, "in": 0, "out": 8}, {"id": "sessions/2026-10-23-rag-service", "name": "2026-10-23-rag-service", "type": "session", "project": "rag-service", "status": null, "in": 0, "out": 3}, {"id": "sessions/2026-10-26-inference-gateway", "name": "2026-10-26-inference-gateway", "type": "session", "project": "inference-gateway", "status": null, "in": 1, "out": 3}, {"id": "sessions/2026-10-27-rag-service", "name": "2026-10-27-rag-service", "type": "session", "project": "rag-service", "status": null, "in": 1, "out": 3}, {"id": "sessions/2026-10-28-tooling", "name": "2026-10-28-tooling", "type": "session", "project": "shared", "status": null, "in": 2, "out": 2}, {"id": "sessions/2026-W44-rollup", "name": "2026-W44-rollup", "type": "rollup", "project": "shared", "status": null, "in": 0, "out": 7}, {"id": "shared/lessons/checks-beat-checklists", "name": "checks-beat-checklists", "type": "lesson", "project": "shared", "status": null, "in": 3, "out": 2}, {"id": "shared/lessons/reproduce-before-fixing", "name": "reproduce-before-fixing", "type": "lesson", "project": "shared", "status": null, "in": 6, "out": 3}, {"id": "shared/reference/dev-environment", "name": "dev-environment", "type": "reference", "project": "shared", "status": null, "in": 2, "out": 1}, {"id": "shared/reference/vector-store-comparison", "name": "vector-store-comparison", "type": "reference", "project": "rag-service", "status": null, "in": 1, "out": 1}], "edges": [{"source": "README", "target": "rag-service/project", "label": "mentions"}, {"source": "README", "target": "inference-gateway/project", "label": "mentions"}, {"source": "github/activity/2026-10-19", "target": "github/repos/rag-service", "label": "repos"}, {"source": "github/activity/2026-10-19", "target": "github/repos/rag-service", "label": "mentions"}, {"source": "github/activity/2026-10-21", "target": "github/repos/inference-gateway", "label": "repos"}, {"source": "github/activity/2026-10-21", "target": "github/repos/inference-gateway", "label": "mentions"}, {"source": "github/repos/inference-gateway", "target": "inference-gateway/project", "label": "mentions"}, {"source": "github/repos/rag-service", "target": "rag-service/project", "label": "mentions"}, {"source": "inference-gateway/decisions/sse-over-websockets", "target": "inference-gateway/tasks/streaming-backpressure", "label": "task"}, {"source": "inference-gateway/lessons/backpressure-at-the-edge", "target": "inference-gateway/tasks/streaming-backpressure", "label": "source"}, {"source": "inference-gateway/lessons/backpressure-at-the-edge", "target": "inference-gateway/tasks/streaming-backpressure", "label": "mentions"}, {"source": "inference-gateway/lessons/cache-keys-include-model-version", "target": "inference-gateway/tasks/prompt-cache-keys", "label": "source"}, {"source": "inference-gateway/lessons/cache-keys-include-model-version", "target": "inference-gateway/tasks/prompt-cache-keys", "label": "mentions"}, {"source": "inference-gateway/project", "target": "github/repos/inference-gateway", "label": "repo"}, {"source": "inference-gateway/project", "target": "inference-gateway/tasks/prompt-cache-keys", "label": "mentions"}, {"source": "inference-gateway/project", "target": "inference-gateway/tasks/streaming-backpressure", "label": "mentions"}, {"source": "inference-gateway/project", "target": "inference-gateway/tasks/provider-failover", "label": "mentions"}, {"source": "inference-gateway/tasks/prompt-cache-keys", "target": "github/repos/inference-gateway", "label": "repo"}, {"source": "inference-gateway/tasks/prompt-cache-keys", "target": "inference-gateway/lessons/cache-keys-include-model-version", "label": "mentions"}, {"source": "inference-gateway/tasks/provider-failover", "target": "github/repos/inference-gateway", "label": "repo"}, {"source": "inference-gateway/tasks/provider-failover", "target": "raw/inference-gateway/2026-10-20-provider-rate-limit-notes", "label": "mentions"}, {"source": "inference-gateway/tasks/provider-failover", "target": "shared/lessons/reproduce-before-fixing", "label": "mentions"}, {"source": "inference-gateway/tasks/streaming-backpressure", "target": "github/repos/inference-gateway", "label": "repo"}, {"source": "inference-gateway/tasks/streaming-backpressure", "target": "shared/lessons/reproduce-before-fixing", "label": "mentions"}, {"source": "inference-gateway/tasks/streaming-backpressure", "target": "inference-gateway/decisions/sse-over-websockets", "label": "mentions"}, {"source": "inference-gateway/tasks/streaming-backpressure", "target": "inference-gateway/lessons/backpressure-at-the-edge", "label": "mentions"}, {"source": "rag-service/decisions/pgvector-over-dedicated-vector-db", "target": "rag-service/tasks/hybrid-bm25-dense", "label": "task"}, {"source": "rag-service/decisions/pgvector-over-dedicated-vector-db", "target": "shared/reference/vector-store-comparison", "label": "mentions"}, {"source": "rag-service/lessons/chunk-on-structure-not-tokens", "target": "rag-service/tasks/chunk-by-headings", "label": "source"}, {"source": "rag-service/lessons/chunk-on-structure-not-tokens", "target": "rag-service/tasks/chunk-by-headings", "label": "mentions"}, {"source": "rag-service/lessons/measure-recall-before-reranking", "target": "rag-service/tasks/reranker-latency", "label": "source"}, {"source": "rag-service/lessons/measure-recall-before-reranking", "target": "rag-service/tasks/reranker-latency", "label": "mentions"}, {"source": "rag-service/project", "target": "github/repos/rag-service", "label": "repo"}, {"source": "rag-service/project", "target": "rag-service/tasks/retrieval-regression-set", "label": "mentions"}, {"source": "rag-service/project", "target": "rag-service/tasks/hybrid-bm25-dense", "label": "mentions"}, {"source": "rag-service/project", "target": "rag-service/tasks/chunk-by-headings", "label": "mentions"}, {"source": "rag-service/project", "target": "rag-service/tasks/reranker-latency", "label": "mentions"}, {"source": "rag-service/project", "target": "rag-service/tasks/embedding-cache", "label": "mentions"}, {"source": "rag-service/tasks/chunk-by-headings", "target": "github/repos/rag-service", "label": "repo"}, {"source": "rag-service/tasks/chunk-by-headings", "target": "rag-service/lessons/chunk-on-structure-not-tokens", "label": "mentions"}, {"source": "rag-service/tasks/embedding-cache", "target": "github/repos/rag-service", "label": "repo"}, {"source": "rag-service/tasks/embedding-cache", "target": "inference-gateway/lessons/cache-keys-include-model-version", "label": "mentions"}, {"source": "rag-service/tasks/hybrid-bm25-dense", "target": "github/repos/rag-service", "label": "repo"}, {"source": "rag-service/tasks/hybrid-bm25-dense", "target": "rag-service/decisions/pgvector-over-dedicated-vector-db", "label": "mentions"}, {"source": "rag-service/tasks/hybrid-bm25-dense", "target": "rag-service/tasks/retrieval-regression-set", "label": "mentions"}, {"source": "rag-service/tasks/reranker-latency", "target": "github/repos/rag-service", "label": "repo"}, {"source": "rag-service/tasks/reranker-latency", "target": "rag-service/lessons/measure-recall-before-reranking", "label": "mentions"}, {"source": "rag-service/tasks/retrieval-regression-set", "target": "github/repos/rag-service", "label": "repo"}, {"source": "rag-service/tasks/retrieval-regression-set", "target": "raw/rag-service/2026-10-18-support-ticket-notes", "label": "mentions"}, {"source": "rag-service/tasks/retrieval-regression-set", "target": "shared/lessons/checks-beat-checklists", "label": "mentions"}, {"source": "sessions/2026-10-18-rag-service", "target": "rag-service/tasks/retrieval-regression-set", "label": "touched"}, {"source": "sessions/2026-10-18-rag-service", "target": "shared/lessons/checks-beat-checklists", "label": "touched"}, {"source": "sessions/2026-10-18-rag-service", "target": "rag-service/project", "label": "touched"}, {"source": "sessions/2026-10-18-rag-service", "target": "shared/lessons/checks-beat-checklists", "label": "mentions"}, {"source": "sessions/2026-10-18-rag-service", "target": "rag-service/tasks/hybrid-bm25-dense", "label": "mentions"}, {"source": "sessions/2026-10-19-rag-service", "target": "rag-service/tasks/hybrid-bm25-dense", "label": "touched"}, {"source": "sessions/2026-10-19-rag-service", "target": "rag-service/tasks/chunk-by-headings", "label": "touched"}, {"source": "sessions/2026-10-19-rag-service", "target": "rag-service/lessons/chunk-on-structure-not-tokens", "label": "touched"}, {"source": "sessions/2026-10-19-rag-service", "target": "rag-service/decisions/pgvector-over-dedicated-vector-db", "label": "touched"}, {"source": "sessions/2026-10-19-rag-service", "target": "rag-service/lessons/chunk-on-structure-not-tokens", "label": "mentions"}, {"source": "sessions/2026-10-19-rag-service", "target": "rag-service/decisions/pgvector-over-dedicated-vector-db", "label": "mentions"}, {"source": "sessions/2026-10-21-inference-gateway", "target": "inference-gateway/tasks/prompt-cache-keys", "label": "touched"}, {"source": "sessions/2026-10-21-inference-gateway", "target": "inference-gateway/tasks/streaming-backpressure", "label": "touched"}, {"source": "sessions/2026-10-21-inference-gateway", "target": "inference-gateway/lessons/cache-keys-include-model-version", "label": "touched"}, {"source": "sessions/2026-10-21-inference-gateway", "target": "inference-gateway/lessons/backpressure-at-the-edge", "label": "touched"}, {"source": "sessions/2026-10-21-inference-gateway", "target": "shared/lessons/reproduce-before-fixing", "label": "touched"}, {"source": "sessions/2026-10-21-inference-gateway", "target": "inference-gateway/decisions/sse-over-websockets", "label": "touched"}, {"source": "sessions/2026-10-21-inference-gateway", "target": "inference-gateway/lessons/cache-keys-include-model-version", "label": "mentions"}, {"source": "sessions/2026-10-21-inference-gateway", "target": "inference-gateway/decisions/sse-over-websockets", "label": "mentions"}, {"source": "sessions/2026-10-23-rag-service", "target": "rag-service/tasks/reranker-latency", "label": "touched"}, {"source": "sessions/2026-10-23-rag-service", "target": "rag-service/lessons/measure-recall-before-reranking", "label": "touched"}, {"source": "sessions/2026-10-23-rag-service", "target": "rag-service/lessons/measure-recall-before-reranking", "label": "mentions"}, {"source": "sessions/2026-10-26-inference-gateway", "target": "inference-gateway/tasks/provider-failover", "label": "touched"}, {"source": "sessions/2026-10-26-inference-gateway", "target": "shared/lessons/reproduce-before-fixing", "label": "touched"}, {"source": "sessions/2026-10-26-inference-gateway", "target": "shared/lessons/reproduce-before-fixing", "label": "mentions"}, {"source": "sessions/2026-10-27-rag-service", "target": "rag-service/tasks/embedding-cache", "label": "touched"}, {"source": "sessions/2026-10-27-rag-service", "target": "inference-gateway/lessons/cache-keys-include-model-version", "label": "touched"}, {"source": "sessions/2026-10-27-rag-service", "target": "inference-gateway/lessons/cache-keys-include-model-version", "label": "mentions"}, {"source": "sessions/2026-10-28-tooling", "target": "shared/reference/dev-environment", "label": "touched"}, {"source": "sessions/2026-10-28-tooling", "target": "shared/reference/dev-environment", "label": "mentions"}, {"source": "sessions/2026-W44-rollup", "target": "sessions/2026-10-26-inference-gateway", "label": "touched"}, {"source": "sessions/2026-W44-rollup", "target": "sessions/2026-10-27-rag-service", "label": "touched"}, {"source": "sessions/2026-W44-rollup", "target": "sessions/2026-10-28-tooling", "label": "touched"}, {"source": "sessions/2026-W44-rollup", "target": "inference-gateway/tasks/provider-failover", "label": "mentions"}, {"source": "sessions/2026-W44-rollup", "target": "shared/lessons/reproduce-before-fixing", "label": "mentions"}, {"source": "sessions/2026-W44-rollup", "target": "rag-service/tasks/embedding-cache", "label": "mentions"}, {"source": "shared/lessons/checks-beat-checklists", "target": "rag-service/tasks/retrieval-regression-set", "label": "source"}, {"source": "shared/lessons/checks-beat-checklists", "target": "rag-service/tasks/retrieval-regression-set", "label": "mentions"}, {"source": "shared/lessons/reproduce-before-fixing", "target": "inference-gateway/tasks/streaming-backpressure", "label": "source"}, {"source": "shared/lessons/reproduce-before-fixing", "target": "inference-gateway/tasks/streaming-backpressure", "label": "mentions"}, {"source": "shared/lessons/reproduce-before-fixing", "target": "inference-gateway/tasks/provider-failover", "label": "mentions"}, {"source": "shared/reference/dev-environment", "target": "sessions/2026-10-28-tooling", "label": "mentions"}, {"source": "shared/reference/vector-store-comparison", "target": "rag-service/decisions/pgvector-over-dedicated-vector-db", "label": "mentions"}]};
+const TYPES = ["task", "lesson", "decision", "session", "project", "repo", "reference", "activity", "other"];
+const SHAPE = { task: d3.symbolCircle, lesson: d3.symbolTriangle, decision: d3.symbolDiamond, session: d3.symbolSquare,
+                project: d3.symbolStar, repo: d3.symbolCross, reference: d3.symbolWye, activity: d3.symbolSquare, other: d3.symbolCircle };
+const typeOf = t => TYPES.includes(t) ? t : "other";
+const color = t => `var(--t-${typeOf(t)})`;
+const nodes = DATA.nodes.filter(n => n.type !== "index").map(n => ({ ...n }));
+const ids = new Set(nodes.map(n => n.id));
+const links = DATA.edges.filter(e => ids.has(e.source) && ids.has(e.target)).map(e => ({ ...e }));
+document.getElementById("sub").textContent =
+  `${nodes.length} notes, ${links.length} links. Drag to rearrange, scroll to zoom, hover a node to see its neighbours.`;
+
+const hidden = new Set();
+const present = TYPES.filter(t => nodes.some(n => typeOf(n.type) === t));
+const legend = d3.select("#legend");
+present.forEach(t => {
+  const count = nodes.filter(n => typeOf(n.type) === t).length;
+  const b = legend.append("button").attr("class", "chip").attr("aria-pressed", "true")
+    .on("click", function () {
+      hidden.has(t) ? hidden.delete(t) : hidden.add(t);
+      d3.select(this).attr("aria-pressed", hidden.has(t) ? "false" : "true");
+      applyFilter();
+    });
+  b.append("svg").attr("width", 12).attr("height", 12).attr("aria-hidden", "true")
+    .append("path").attr("transform", "translate(6,6)").attr("d", d3.symbol(SHAPE[t], 60)).attr("fill", color(t));
+  b.append("span").text(`${t} ${count}`);
+});
+
+const svg = d3.select("#g");
+const root = svg.append("g");
+svg.call(d3.zoom().scaleExtent([0.2, 5]).on("zoom", ev => root.attr("transform", ev.transform)));
+const size = d => 70 + 40 * Math.sqrt(d.in);
+const link = root.append("g").selectAll("line").data(links).join("line")
+  .attr("stroke", "var(--edge)").attr("stroke-width", 1.2)
+  .attr("stroke-dasharray", d => d.label === "mentions" ? "3 3" : null);
+const node = root.append("g").selectAll("path").data(nodes).join("path")
+  .attr("d", d => d3.symbol(SHAPE[typeOf(d.type)], d.type === "project" ? 360 : size(d))())
+  .attr("fill", d => color(d.type)).attr("stroke", "var(--surface-2)").attr("stroke-width", 2)
+  .style("cursor", "grab");
+const label = root.append("g").selectAll("text").data(nodes.filter(n => n.type === "project" || n.type === "lesson")).join("text")
+  .text(d => d.type === "project" ? `${d.project} (project)` : d.name).attr("font-size", 11).attr("fill", "var(--text-2)")
+  .attr("dx", 10).attr("dy", 4).style("pointer-events", "none");
+
+const sim = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(l => l.label === "mentions" ? 110 : 70).strength(0.6))
+  .force("charge", d3.forceManyBody().strength(-260))
+  .force("collide", d3.forceCollide(16))
+  .force("x", d3.forceX().strength(0.04)).force("y", d3.forceY().strength(0.06))
+  .on("tick", () => {
+    link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+    label.attr("x", d => d.x).attr("y", d => d.y);
+  });
+function fit() {
+  const r = svg.node().getBoundingClientRect();
+  svg.attr("viewBox", [-r.width / 2, -r.height / 2, r.width, r.height]);
+}
+fit(); window.addEventListener("resize", fit);
+
+node.call(d3.drag()
+  .on("start", (ev, d) => { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+  .on("drag", (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+  .on("end", (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+const tip = document.getElementById("tip");
+const stage = document.querySelector(".stage");
+node.on("pointerenter", (ev, d) => {
+  const nb = new Set([d.id]);
+  links.forEach(l => { if (l.source.id === d.id) nb.add(l.target.id); if (l.target.id === d.id) nb.add(l.source.id); });
+  node.attr("opacity", n => nb.has(n.id) ? 1 : 0.15);
+  link.attr("stroke", l => l.source.id === d.id || l.target.id === d.id ? "var(--edge-hi)" : "var(--edge)");
+  const edgeLabels = [...new Set(links.filter(l => l.source.id === d.id).map(l => l.label))].join(", ");
+  tip.innerHTML = "";
+  const b = document.createElement("b"); b.textContent = d.name; tip.appendChild(b);
+  const s = document.createElement("span");
+  s.textContent = `${d.type} · ${d.project}${d.status ? " · " + d.status : ""} · ${d.in} in / ${d.out} out${edgeLabels ? " · links via " + edgeLabels : ""}`;
+  tip.appendChild(s);
+  tip.style.display = "block";
+}).on("pointermove", ev => {
+  const r = stage.getBoundingClientRect();
+  const x = Math.min(ev.clientX - r.left + 14, r.width - 290);
+  tip.style.left = `${Math.max(16, x)}px`; tip.style.top = `${ev.clientY - r.top + 14}px`;
+}).on("pointerleave", () => {
+  tip.style.display = "none"; applyFilter(); link.attr("stroke", "var(--edge)");
+});
+
+function applyFilter() {
+  const vis = n => !hidden.has(typeOf(n.type));
+  node.attr("opacity", n => vis(n) ? 1 : 0).style("pointer-events", n => vis(n) ? null : "none");
+  label.attr("opacity", n => vis(n) ? 1 : 0);
+  link.attr("opacity", l => vis(l.source) && vis(l.target) ? 1 : 0);
+}
+
+const tbody = d3.select("#table tbody");
+nodes.slice().sort((a, b) => b.in - a.in || a.id.localeCompare(b.id)).forEach(n => {
+  const tr = tbody.append("tr");
+  [n.id, n.type, n.project, n.status || ""].forEach(v => tr.append("td").text(v));
+  tr.append("td").attr("class", "n").text(n.in); tr.append("td").attr("class", "n").text(n.out);
+});
+</script>
+</body>
+</html>
+

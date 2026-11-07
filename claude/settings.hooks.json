@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/session_note_check.py",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

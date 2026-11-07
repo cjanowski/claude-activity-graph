@@ -1,0 +1,22 @@
+filters:
+  and:
+    - type == "task"
+views:
+  - type: table
+    name: All tasks
+    order:
+      - file.name
+      - project
+      - repo
+      - task_type
+      - status
+      - areas
+  - type: table
+    name: Open
+    filters:
+      and:
+        - status != "done"
+    order:
+      - file.name
+      - project
+      - status

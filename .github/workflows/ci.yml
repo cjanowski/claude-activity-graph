@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Example vault lints clean
+        run: python tools/vault_lint.py --vault example-vault --check
+      - name: Graph stats
+        run: python tools/vault_graph.py --vault example-vault stats
+      - name: Installer smoke test
+        run: |
+          CLAUDE_HOME="$RUNNER_TEMP/claude" ./install.sh "$RUNNER_TEMP/vault"
+          test -f "$RUNNER_TEMP/vault/_templates/Session.md"
+          echo '{}' | python "$RUNNER_TEMP/claude/hooks/session_note_check.py"

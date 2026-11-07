@@ -1,0 +1,11 @@
+filters:
+  and:
+    - type == "activity"
+views:
+  - type: table
+    name: GitHub by day
+    order:
+      - date
+      - commits
+      - prs
+      - repos
